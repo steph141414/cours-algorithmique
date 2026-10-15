@@ -1,2 +1,2 @@
 # cours-algorithmique
-Scirpts réalisés en cours d'algorithmique
+Scripts réalisés en cours d'algorithmique
