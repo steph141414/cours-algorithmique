@@ -1,39 +1,189 @@
 #ifndef STRUCTURES_H
 #define STRUCTURES_H
-
+ 
 /*
  * structures.h
- * Piles (stack), files (queue) et tables de hachage (hash table) en C.
- *
- * Les fonctions sont "static inline" : on peut donc inclure ce fichier
- * dans plusieurs .c sans erreur de définitions multiples.
- *
- * Les malloc/calloc/realloc sont "castés" : le fichier est ainsi valide
- * en C ET en C++ (VS Code analyse les .h comme du C++ par défaut).
- *
- * Pile et file : tableaux dynamiques d'entiers (int).
- * Table de hachage : clés = chaînes de caractères, valeurs = int,
- *                    collisions gérées par chaînage (listes chaînées).
+ * Liste chaînée, pile, file et table de hachage en C.
+ * Fonctions "static inline" : le fichier peut être inclus dans plusieurs .c.
+ * Les allocations sont castées : valide en C et en C++.
  */
-
+ 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+ 
 /* ========================================================================
- *  PILE (STACK) — principe LIFO : Last In, First Out
- *  Le dernier élément empilé est le premier dépilé (pile d'assiettes).
- *  Usages : annuler/refaire (undo), appels de fonctions, parenthésage...
- *  Implémentation : tableau dynamique, le "sommet" est à data[size - 1].
+ *  LISTE CHAÎNÉE SIMPLE
+ *  Chaque noeud contient une valeur et un pointeur vers le noeud suivant.
+ *  Insertion en tête en O(1), accès par indice en O(n).
  * ======================================================================== */
-
+ 
+typedef struct ListNode {
+    int value;
+    struct ListNode *next;
+} ListNode;
+ 
 typedef struct {
-    int *data;      /* tableau des éléments            */
-    int  size;      /* nombre d'éléments présents      */
-    int  capacity;  /* taille allouée du tableau       */
+    ListNode *head;
+    int size;
+} List;
+ 
+static inline List *list_create(void)
+{
+    List *l = (List *)malloc(sizeof(List));
+    if (l == NULL) return NULL;
+    l->head = NULL;
+    l->size = 0;
+    return l;
+}
+ 
+static inline int list_is_empty(const List *l) { return l->size == 0; }
+static inline int list_size(const List *l)     { return l->size; }
+ 
+static inline int list_push_front(List *l, int value)
+{
+    ListNode *n = (ListNode *)malloc(sizeof(ListNode));
+    if (n == NULL) return 0;
+    n->value = value;
+    n->next = l->head;
+    l->head = n;
+    l->size++;
+    return 1;
+}
+ 
+static inline int list_push_back(List *l, int value)
+{
+    ListNode *n = (ListNode *)malloc(sizeof(ListNode));
+    if (n == NULL) return 0;
+    n->value = value;
+    n->next = NULL;
+    if (l->head == NULL) {
+        l->head = n;
+    } else {
+        ListNode *cur = l->head;
+        while (cur->next != NULL) cur = cur->next;
+        cur->next = n;
+    }
+    l->size++;
+    return 1;
+}
+ 
+/* Insère à la position index (0 = tête, size = fin). */
+static inline int list_insert(List *l, int index, int value)
+{
+    if (index < 0 || index > l->size) return 0;
+    if (index == 0) return list_push_front(l, value);
+ 
+    ListNode *prev = l->head;
+    for (int i = 0; i < index - 1; i++) prev = prev->next;
+ 
+    ListNode *n = (ListNode *)malloc(sizeof(ListNode));
+    if (n == NULL) return 0;
+    n->value = value;
+    n->next = prev->next;
+    prev->next = n;
+    l->size++;
+    return 1;
+}
+ 
+/* Écrit la valeur à la position index dans *out. */
+static inline int list_get(const List *l, int index, int *out)
+{
+    if (index < 0 || index >= l->size) return 0;
+    ListNode *cur = l->head;
+    for (int i = 0; i < index; i++) cur = cur->next;
+    *out = cur->value;
+    return 1;
+}
+ 
+/* Renvoie l'indice de la première occurrence de value, ou -1. */
+static inline int list_find(const List *l, int value)
+{
+    int i = 0;
+    for (ListNode *cur = l->head; cur != NULL; cur = cur->next, i++)
+        if (cur->value == value) return i;
+    return -1;
+}
+ 
+static inline int list_pop_front(List *l, int *out)
+{
+    if (list_is_empty(l)) return 0;
+    ListNode *n = l->head;
+    if (out != NULL) *out = n->value;
+    l->head = n->next;
+    free(n);
+    l->size--;
+    return 1;
+}
+ 
+/* Supprime le noeud à la position index. */
+static inline int list_remove_at(List *l, int index, int *out)
+{
+    if (index < 0 || index >= l->size) return 0;
+    if (index == 0) return list_pop_front(l, out);
+ 
+    ListNode *prev = l->head;
+    for (int i = 0; i < index - 1; i++) prev = prev->next;
+ 
+    ListNode *n = prev->next;
+    if (out != NULL) *out = n->value;
+    prev->next = n->next;
+    free(n);
+    l->size--;
+    return 1;
+}
+ 
+/* Supprime la première occurrence de value. */
+static inline int list_remove_value(List *l, int value)
+{
+    int i = list_find(l, value);
+    if (i < 0) return 0;
+    return list_remove_at(l, i, NULL);
+}
+ 
+static inline void list_reverse(List *l)
+{
+    ListNode *prev = NULL;
+    ListNode *cur = l->head;
+    while (cur != NULL) {
+        ListNode *next = cur->next;
+        cur->next = prev;
+        prev = cur;
+        cur = next;
+    }
+    l->head = prev;
+}
+ 
+static inline void list_print(const List *l)
+{
+    for (ListNode *cur = l->head; cur != NULL; cur = cur->next)
+        printf("%d -> ", cur->value);
+    printf("NULL\n");
+}
+ 
+static inline void list_free(List *l)
+{
+    if (l == NULL) return;
+    ListNode *cur = l->head;
+    while (cur != NULL) {
+        ListNode *next = cur->next;
+        free(cur);
+        cur = next;
+    }
+    free(l);
+}
+ 
+/* ========================================================================
+ *  PILE (STACK) — LIFO : le dernier empilé est le premier dépilé.
+ *  Tableau dynamique, le sommet est à data[size - 1].
+ * ======================================================================== */
+ 
+typedef struct {
+    int *data;
+    int  size;
+    int  capacity;
 } Stack;
-
-/* Crée une pile vide. Renvoie NULL en cas d'échec. */
+ 
 static inline Stack *stack_create(int capacity)
 {
     Stack *s = (Stack *)malloc(sizeof(Stack));
@@ -45,12 +195,10 @@ static inline Stack *stack_create(int capacity)
     s->capacity = capacity;
     return s;
 }
-
+ 
 static inline int stack_is_empty(const Stack *s) { return s->size == 0; }
 static inline int stack_size(const Stack *s)     { return s->size; }
-
-/* Empile une valeur (le tableau double de taille si besoin).
- * Renvoie 1 si OK, 0 si échec d'allocation. */
+ 
 static inline int stack_push(Stack *s, int value)
 {
     if (s->size == s->capacity) {
@@ -63,8 +211,7 @@ static inline int stack_push(Stack *s, int value)
     s->data[s->size++] = value;
     return 1;
 }
-
-/* Dépile : écrit la valeur dans *out. Renvoie 0 si la pile est vide. */
+ 
 static inline int stack_pop(Stack *s, int *out)
 {
     if (stack_is_empty(s)) return 0;
@@ -72,38 +219,33 @@ static inline int stack_pop(Stack *s, int *out)
     if (out != NULL) *out = s->data[s->size];
     return 1;
 }
-
-/* Lit le sommet sans le retirer. Renvoie 0 si la pile est vide. */
+ 
 static inline int stack_peek(const Stack *s, int *out)
 {
     if (stack_is_empty(s)) return 0;
     *out = s->data[s->size - 1];
     return 1;
 }
-
+ 
 static inline void stack_free(Stack *s)
 {
     if (s == NULL) return;
     free(s->data);
     free(s);
 }
-
+ 
 /* ========================================================================
- *  FILE (QUEUE) — principe FIFO : First In, First Out
- *  Le premier élément entré est le premier sorti (file d'attente).
- *  Usages : parcours en largeur (BFS), ordonnancement, tampons...
- *  Implémentation : tableau CIRCULAIRE. On garde l'indice de la tête
- *  (head) ; la queue se calcule : (head + size) % capacity.
- *  Ainsi enfiler et défiler sont en O(1), sans décaler les éléments.
+ *  FILE (QUEUE) — FIFO : le premier entré est le premier sorti.
+ *  Tableau circulaire : la queue est à l'indice (head + size) % capacity.
  * ======================================================================== */
-
+ 
 typedef struct {
     int *data;
-    int  head;      /* indice du premier élément       */
-    int  size;      /* nombre d'éléments présents      */
+    int  head;
+    int  size;
     int  capacity;
 } Queue;
-
+ 
 static inline Queue *queue_create(int capacity)
 {
     Queue *q = (Queue *)malloc(sizeof(Queue));
@@ -116,13 +258,10 @@ static inline Queue *queue_create(int capacity)
     q->capacity = capacity;
     return q;
 }
-
+ 
 static inline int queue_is_empty(const Queue *q) { return q->size == 0; }
 static inline int queue_size(const Queue *q)     { return q->size; }
-
-/* Enfile une valeur à la fin. Si la file est pleine, on agrandit le
- * tableau en recopiant les éléments "dans l'ordre" à partir de l'indice 0.
- * Renvoie 1 si OK, 0 si échec d'allocation. */
+ 
 static inline int queue_enqueue(Queue *q, int value)
 {
     if (q->size == q->capacity) {
@@ -140,9 +279,7 @@ static inline int queue_enqueue(Queue *q, int value)
     q->size++;
     return 1;
 }
-
-/* Défile le premier élément : écrit la valeur dans *out.
- * Renvoie 0 si la file est vide. */
+ 
 static inline int queue_dequeue(Queue *q, int *out)
 {
     if (queue_is_empty(q)) return 0;
@@ -151,46 +288,40 @@ static inline int queue_dequeue(Queue *q, int *out)
     q->size--;
     return 1;
 }
-
-/* Lit le premier élément sans le retirer. Renvoie 0 si vide. */
+ 
 static inline int queue_peek(const Queue *q, int *out)
 {
     if (queue_is_empty(q)) return 0;
     *out = q->data[q->head];
     return 1;
 }
-
+ 
 static inline void queue_free(Queue *q)
 {
     if (q == NULL) return;
     free(q->data);
     free(q);
 }
-
+ 
 /* ========================================================================
  *  TABLE DE HACHAGE (HASH TABLE)
- *  Associe une clé (ici une chaîne) à une valeur (ici un int), avec un
- *  accès en O(1) en moyenne (contre O(n) pour une recherche linéaire).
- *  Principe : une fonction de hachage transforme la clé en un nombre,
- *  qu'on réduit modulo le nombre de cases (buckets) pour obtenir l'indice.
- *  Collisions (deux clés dans la même case) : chaînage, chaque case
- *  contient une liste chaînée d'entrées.
- *  Usages : dictionnaires, caches, comptage d'occurrences, index...
+ *  Clés = chaînes, valeurs = int. L'indice de la case est
+ *  hash(clé) % nb_buckets ; les collisions sont gérées par chaînage.
  * ======================================================================== */
-
+ 
 typedef struct HashEntry {
-    char *key;                  /* copie de la clé (allouée)        */
+    char *key;
     int   value;
-    struct HashEntry *next;     /* entrée suivante dans la case     */
+    struct HashEntry *next;
 } HashEntry;
-
+ 
 typedef struct {
-    HashEntry **buckets;        /* tableau de listes chaînées       */
+    HashEntry **buckets;
     int nb_buckets;
-    int count;                  /* nombre de couples clé/valeur     */
+    int count;
 } HashTable;
-
-/* Fonction de hachage djb2 (classique et simple). */
+ 
+/* Fonction de hachage djb2. */
 static inline unsigned long ht_hash(const char *key)
 {
     unsigned long h = 5381;
@@ -199,8 +330,7 @@ static inline unsigned long ht_hash(const char *key)
         h = h * 33 + (unsigned long)c;
     return h;
 }
-
-/* Copie d'une chaîne (strdup n'est pas du C standard, on l'écrit). */
+ 
 static inline char *ht_strdup(const char *s)
 {
     size_t len = strlen(s) + 1;
@@ -208,7 +338,7 @@ static inline char *ht_strdup(const char *s)
     if (copy != NULL) memcpy(copy, s, len);
     return copy;
 }
-
+ 
 static inline HashTable *ht_create(int nb_buckets)
 {
     HashTable *ht = (HashTable *)malloc(sizeof(HashTable));
@@ -220,8 +350,7 @@ static inline HashTable *ht_create(int nb_buckets)
     ht->count = 0;
     return ht;
 }
-
-/* Cherche l'entrée d'une clé (NULL si absente). */
+ 
 static inline HashEntry *ht_find(const HashTable *ht, const char *key)
 {
     unsigned long idx = ht_hash(key) % (unsigned long)ht->nb_buckets;
@@ -229,28 +358,26 @@ static inline HashEntry *ht_find(const HashTable *ht, const char *key)
         if (strcmp(e->key, key) == 0) return e;
     return NULL;
 }
-
-/* Insère ou met à jour (si la clé existe déjà, on remplace la valeur).
- * Renvoie 1 si OK, 0 si échec d'allocation. */
+ 
+/* Insère, ou met à jour la valeur si la clé existe déjà. */
 static inline int ht_put(HashTable *ht, const char *key, int value)
 {
     HashEntry *e = ht_find(ht, key);
     if (e != NULL) { e->value = value; return 1; }
-
+ 
     e = (HashEntry *)malloc(sizeof(HashEntry));
     if (e == NULL) return 0;
     e->key = ht_strdup(key);
     if (e->key == NULL) { free(e); return 0; }
     e->value = value;
-
+ 
     unsigned long idx = ht_hash(key) % (unsigned long)ht->nb_buckets;
-    e->next = ht->buckets[idx];     /* insertion en tête de liste */
+    e->next = ht->buckets[idx];
     ht->buckets[idx] = e;
     ht->count++;
     return 1;
 }
-
-/* Récupère la valeur d'une clé dans *out. Renvoie 0 si absente. */
+ 
 static inline int ht_get(const HashTable *ht, const char *key, int *out)
 {
     HashEntry *e = ht_find(ht, key);
@@ -258,13 +385,12 @@ static inline int ht_get(const HashTable *ht, const char *key, int *out)
     *out = e->value;
     return 1;
 }
-
+ 
 static inline int ht_contains(const HashTable *ht, const char *key)
 {
     return ht_find(ht, key) != NULL;
 }
-
-/* Supprime une clé. Renvoie 1 si supprimée, 0 si elle n'existait pas. */
+ 
 static inline int ht_remove(HashTable *ht, const char *key)
 {
     unsigned long idx = ht_hash(key) % (unsigned long)ht->nb_buckets;
@@ -281,8 +407,7 @@ static inline int ht_remove(HashTable *ht, const char *key)
     }
     return 0;
 }
-
-/* Affiche le contenu, case par case (utile pour voir les collisions). */
+ 
 static inline void ht_print(const HashTable *ht)
 {
     for (int i = 0; i < ht->nb_buckets; i++) {
@@ -293,7 +418,7 @@ static inline void ht_print(const HashTable *ht)
         printf("\n");
     }
 }
-
+ 
 static inline void ht_free(HashTable *ht)
 {
     if (ht == NULL) return;
@@ -309,5 +434,6 @@ static inline void ht_free(HashTable *ht)
     free(ht->buckets);
     free(ht);
 }
-
+ 
 #endif /* STRUCTURES_H */
+ 

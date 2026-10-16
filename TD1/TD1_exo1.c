@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <time.h>
 
-int fib(int n){
+int fib_naive(int n){
     if (n < 2){
         return n;
     } else {
@@ -22,36 +22,6 @@ int fib_dynamic(int n){
     return fib1[n];
 } 
 
-
-
-
-int naive_primes(int n){
-    int p_count=0;
-    for (int i=2; i<n ; i=i+1){
-        int d=2;
-        while (d*d <= i){
-            if (i%d==0){
-                p_count=p_count+1;
-                break;
-            } else {
-                d=d+1;
-            }
-
-        }
-
-    }
-    return p_count;
-
-}
-
-
-
-//int dynamic_primes(int n){
-    //bool tab[n]={true};
-    //for (int i; i<n; i=i+1){
-
-    //}
-//}
 
 
 int main(){
